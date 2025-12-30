@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Data files
+*.csv
+!sample*.csv
+*.xlsx
+*.xls
+
+# Exception: allow data.csv (will be gitignored but noted)
+# Note: data.csv is the default input file
+
+# Output files
+nurses_filtered.csv
+*_filtered.csv
+*_output.csv
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
