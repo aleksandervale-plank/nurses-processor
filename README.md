@@ -9,6 +9,9 @@ A high-performance Python tool for processing large NPI (National Provider Ident
 - **Flexible Filtering**: Filter by nurse taxonomy codes, name, city, and state
 - **Progress Tracking**: Real-time progress updates during processing
 - **Multiple Nurse Types**: Filters for Nurse Practitioners, Registered Nurses (RN), and Licensed Practical Nurses (LPN)
+- **Interactive Viewer**: Beautiful terminal-based viewer to explore and filter results without creating new files
+- **Statistics**: View distribution by state, city, and nurse types
+- **Bilingual Documentation**: Complete documentation in English and Portuguese
 
 ## Installation
 
@@ -23,6 +26,7 @@ pip install -r requirements.txt
 
 - **polars** (recommended): Fast DataFrame library for large file processing
 - **pandas** (fallback): Alternative DataFrame library if polars is unavailable
+- **tabulate** (optional): For beautiful table formatting in the interactive viewer
 
 ## Nurse Taxonomy Codes
 
@@ -34,13 +38,40 @@ The script filters for the following nurse taxonomy codes across all 15 possible
 
 ## Usage
 
+### Workflow Overview
+
+1. **Process the large CSV file** (one time):
+   ```bash
+   python process_nurses.py --output nurses.csv
+   ```
+
+2. **Explore and filter results** (as many times as you want):
+   ```bash
+   python view_nurses.py
+   ```
+
 ### Basic Usage
 
 Extract all nurses from a CSV file:
 
 ```bash
-python process_nurses.py input.csv --output nurses.csv
+# Uses data.csv automatically (or specify a file)
+python process_nurses.py --output nurses.csv
 ```
+
+### Interactive Viewer
+
+After processing, use the interactive viewer to explore results:
+
+```bash
+python view_nurses.py
+```
+
+Features:
+- Filter by name, city, state
+- View statistics
+- Beautiful formatted tables
+- No new files created (unless you export)
 
 ### Filter by State
 
