@@ -36,6 +36,10 @@ FILTER_COLUMNS = {
     'state': 'Provider Business Practice Location Address State Name',
 }
 
+# Phone number columns
+PHONE_MAILING_COLUMN = 'Provider Business Mailing Address Telephone Number'
+PHONE_PRACTICE_COLUMN = 'Provider Business Practice Location Address Telephone Number'
+
 # Processing configuration
 DEFAULT_CHUNK_SIZE = 100000  # Process 100K rows at a time
 DEFAULT_OUTPUT_FILE = 'nurses_filtered.csv'

@@ -27,6 +27,8 @@ from config import (
     NURSE_TAXONOMY_CODES,
     TAXONOMY_CODE_COLUMNS,
     FILTER_COLUMNS,
+    PHONE_MAILING_COLUMN,
+    PHONE_PRACTICE_COLUMN,
     DEFAULT_CHUNK_SIZE,
     DEFAULT_OUTPUT_FILE
 )
@@ -54,6 +56,7 @@ def filter_nurses_polars(
     last_name: Optional[str] = None,
     city: Optional[str] = None,
     state: Optional[str] = None,
+    different_phones: Optional[bool] = False,
 ) -> dict:
     """
     Filter nurses from CSV using Polars (faster for large files).
@@ -89,6 +92,8 @@ def filter_nurses_polars(
         filters_applied.append(f"City contains '{city}'")
     if state:
         filters_applied.append(f"State = '{state}'")
+    if different_phones:
+        filters_applied.append("Mailing phone ≠ Practice location phone")
     
     if filters_applied:
         print(f"Filters: {', '.join(filters_applied)}")
@@ -145,6 +150,15 @@ def filter_nurses_polars(
                     pl.col(FILTER_COLUMNS['state']).str.to_uppercase() == state.upper()
                 )
             
+            # Filter by different phone numbers
+            if different_phones:
+                if PHONE_MAILING_COLUMN in df_filtered.columns and PHONE_PRACTICE_COLUMN in df_filtered.columns:
+                    df_filtered = df_filtered.filter(
+                        (pl.col(PHONE_MAILING_COLUMN).is_not_null()) &
+                        (pl.col(PHONE_PRACTICE_COLUMN).is_not_null()) &
+                        (pl.col(PHONE_MAILING_COLUMN) != pl.col(PHONE_PRACTICE_COLUMN))
+                    )
+            
             chunk_filtered = len(df_filtered)
             filtered_rows += chunk_filtered
             
@@ -181,6 +195,7 @@ def filter_nurses_pandas(
     last_name: Optional[str] = None,
     city: Optional[str] = None,
     state: Optional[str] = None,
+    different_phones: Optional[bool] = False,
 ) -> dict:
     """
     Filter nurses from CSV using Pandas (fallback method).
@@ -216,6 +231,8 @@ def filter_nurses_pandas(
         filters_applied.append(f"City contains '{city}'")
     if state:
         filters_applied.append(f"State = '{state}'")
+    if different_phones:
+        filters_applied.append("Mailing phone ≠ Practice location phone")
     
     if filters_applied:
         print(f"Filters: {', '.join(filters_applied)}")
@@ -257,6 +274,15 @@ def filter_nurses_pandas(
             df_filtered = df_filtered[
                 df_filtered[FILTER_COLUMNS['state']].str.upper() == state.upper()
             ]
+        
+        # Filter by different phone numbers
+        if different_phones:
+            if PHONE_MAILING_COLUMN in df_filtered.columns and PHONE_PRACTICE_COLUMN in df_filtered.columns:
+                df_filtered = df_filtered[
+                    df_filtered[PHONE_MAILING_COLUMN].notna() &
+                    df_filtered[PHONE_PRACTICE_COLUMN].notna() &
+                    (df_filtered[PHONE_MAILING_COLUMN] != df_filtered[PHONE_PRACTICE_COLUMN])
+                ]
         
         chunk_filtered = len(df_filtered)
         filtered_rows += chunk_filtered
@@ -350,6 +376,12 @@ Nurse Taxonomy Codes Filtered:
         help='Filter by state code (e.g., CA, NY, TX)'
     )
     
+    parser.add_argument(
+        '--different-phones',
+        action='store_true',
+        help='Filter nurses where mailing phone number is different from practice location phone number'
+    )
+    
     args = parser.parse_args()
     
     # Get the script directory (project root)
@@ -385,7 +417,8 @@ Nurse Taxonomy Codes Filtered:
                 args.first_name,
                 args.last_name,
                 args.city,
-                args.state
+                args.state,
+                args.different_phones
             )
         else:
             stats = filter_nurses_pandas(
@@ -395,7 +428,8 @@ Nurse Taxonomy Codes Filtered:
                 args.first_name,
                 args.last_name,
                 args.city,
-                args.state
+                args.state,
+                args.different_phones
             )
         
         # Print summary

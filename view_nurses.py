@@ -39,6 +39,42 @@ def format_value(value, max_length=30):
     return value_str
 
 
+def format_phone(value):
+    """Formata um número de telefone para exibição."""
+    if pd.isna(value) or value == '':
+        return '-'
+    
+    # Se for número (int, float, numpy int64, etc), converter para inteiro primeiro
+    # Isso evita notação científica
+    try:
+        if isinstance(value, (int, float)) or str(type(value)).find('int') != -1 or str(type(value)).find('float') != -1:
+            phone_num = int(value)
+            return str(phone_num)
+    except (ValueError, OverflowError, TypeError):
+        pass
+    
+    # Converter para string
+    phone_str = str(value)
+    
+    # Se for notação científica em string, converter para inteiro primeiro
+    if 'e+' in phone_str.lower() or 'e-' in phone_str.lower():
+        try:
+            phone_num = int(float(phone_str))
+            phone_str = str(phone_num)
+        except (ValueError, OverflowError):
+            pass
+    
+    # Remover '.0' no final se existir (de floats convertidos)
+    if phone_str.endswith('.0'):
+        phone_str = phone_str[:-2]
+    
+    # Remover 'nan' string
+    if phone_str.lower() == 'nan':
+        return '-'
+    
+    return phone_str
+
+
 def display_results(df, page_size=20, page=1):
     """Exibe os resultados de forma paginada e formatada."""
     if len(df) == 0:
@@ -82,7 +118,11 @@ def display_results(df, page_size=20, page=1):
     for col in df_page.columns:
         if col == 'NPI':
             continue  # Manter NPI completo
-        df_page[col] = df_page[col].apply(lambda x: format_value(x, 25 if col in ['Nome', 'Sobrenome'] else 20))
+        if col == 'Telefone':
+            # Formatação especial para telefone: remove '.0' se for número float convertido
+            df_page[col] = df_page[col].apply(lambda x: format_phone(x))
+        else:
+            df_page[col] = df_page[col].apply(lambda x: format_value(x, 25 if col in ['Nome', 'Sobrenome'] else 20))
     
     print("\n" + "="*100)
     print(f"📊 RESULTADOS: Mostrando {start_idx+1}-{end_idx} de {len(df)} enfermeiras")
@@ -112,6 +152,8 @@ def get_filter_summary(filters):
         parts.append(f"Cidade: '{filters['city']}'")
     if filters.get('state'):
         parts.append(f"Estado: '{filters['state']}'")
+    if filters.get('different_phones'):
+        parts.append("Telefones diferentes")
     
     return " | ".join(parts)
 
@@ -146,6 +188,17 @@ def apply_filters(df, filters):
         if col in filtered_df.columns:
             filtered_df = filtered_df[
                 filtered_df[col].str.upper() == filters['state'].upper()
+            ]
+    
+    # Filter by different phone numbers
+    if filters.get('different_phones'):
+        mailing_col = 'Provider Business Mailing Address Telephone Number'
+        practice_col = 'Provider Business Practice Location Address Telephone Number'
+        if mailing_col in filtered_df.columns and practice_col in filtered_df.columns:
+            filtered_df = filtered_df[
+                filtered_df[mailing_col].notna() &
+                filtered_df[practice_col].notna() &
+                (filtered_df[mailing_col] != filtered_df[practice_col])
             ]
     
     return filtered_df
@@ -230,7 +283,8 @@ def main():
         'first_name': None,
         'last_name': None,
         'city': None,
-        'state': None
+        'state': None,
+        'different_phones': False
     }
     
     current_page = 1
@@ -255,6 +309,7 @@ def main():
         print("  7) Ver estatísticas")
         print("  8) Exportar resultados filtrados")
         print("  9) Busca rápida (nome completo)")
+        print(" 10) Filtrar: telefones diferentes (mailing ≠ practice)")
         print("  0) Sair")
         print("="*60)
         
@@ -265,20 +320,24 @@ def main():
             break
         
         elif choice == '1':
-            clear_screen()
-            display_results(filtered_df, page_size=20, page=current_page)
-            
-            total_pages = (len(filtered_df) - 1) // 20 + 1
-            if total_pages > 1:
-                nav = input("\nNavegação: [n]próxima [p]anterior [v]voltar: ").strip().lower()
-                if nav == 'n' and current_page < total_pages:
-                    current_page += 1
-                elif nav == 'p' and current_page > 1:
-                    current_page -= 1
-                elif nav == 'v':
-                    current_page = 1
-            else:
-                input("\nPressione Enter para continuar...")
+            while True:
+                clear_screen()
+                display_results(filtered_df, page_size=20, page=current_page)
+                
+                total_pages = (len(filtered_df) - 1) // 20 + 1
+                if total_pages > 1:
+                    nav = input("\nNavegação: [n]próxima [p]anterior [v]voltar: ").strip().lower()
+                    if nav == 'n' and current_page < total_pages:
+                        current_page += 1
+                    elif nav == 'p' and current_page > 1:
+                        current_page -= 1
+                    elif nav == 'v':
+                        current_page = 1
+                        break
+                    # Se não foi 'v', continua no loop mostrando a nova página
+                else:
+                    input("\nPressione Enter para continuar...")
+                    break
         
         elif choice == '2':
             first_name = input("\nDigite o nome (ou Enter para limpar): ").strip()
@@ -309,7 +368,8 @@ def main():
                 'first_name': None,
                 'last_name': None,
                 'city': None,
-                'state': None
+                'state': None,
+                'different_phones': False
             }
             filtered_df = df.copy()
             current_page = 1
@@ -355,6 +415,14 @@ def main():
                 display_results(quick_df, page_size=20, page=1)
             input("\nPressione Enter para continuar...")
         
+        elif choice == '10':
+            filters['different_phones'] = not filters.get('different_phones', False)
+            status = "ATIVADO" if filters['different_phones'] else "DESATIVADO"
+            print(f"\n✅ Filtro de telefones diferentes {status}")
+            filtered_df = apply_filters(df, filters)
+            current_page = 1
+            input("Pressione Enter para continuar...")
+        
         else:
             print("\n❌ Opção inválida!")
             input("Pressione Enter para continuar...")
@@ -366,4 +434,5 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         print("\n\n👋 Programa interrompido. Até logo!\n")
         sys.exit(0)
+
 
