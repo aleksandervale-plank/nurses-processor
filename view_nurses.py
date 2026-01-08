@@ -6,6 +6,8 @@ Permite visualizar e filtrar o arquivo nurses.csv de forma bonita e interativa.
 
 import sys
 import os
+from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
 
 # Try to import required libraries
 try:
@@ -90,9 +92,9 @@ def display_results(df, page_size=20, page=1):
         'NPI',
         'Provider First Name',
         'Provider Last Name (Legal Name)',
-        'Provider Business Practice Location Address City Name',
-        'Provider Business Practice Location Address State Name',
-        'Healthcare Provider Taxonomy Code_1',
+        'Provider Credential Text',
+        'Provider License Number_1',
+        'Provider License Number State Code_1',
         'Provider Business Practice Location Address Telephone Number'
     ]
     
@@ -106,9 +108,9 @@ def display_results(df, page_size=20, page=1):
         'NPI': 'NPI',
         'Provider First Name': 'Nome',
         'Provider Last Name (Legal Name)': 'Sobrenome',
-        'Provider Business Practice Location Address City Name': 'Cidade',
-        'Provider Business Practice Location Address State Name': 'Estado',
-        'Healthcare Provider Taxonomy Code_1': 'Código',
+        'Provider Credential Text': 'Tipo Licença',
+        'Provider License Number_1': 'Licença',
+        'Provider License Number State Code_1': 'Estado Licença',
         'Provider Business Practice Location Address Telephone Number': 'Telefone'
     }
     
@@ -152,8 +154,14 @@ def get_filter_summary(filters):
         parts.append(f"Cidade: '{filters['city']}'")
     if filters.get('state'):
         parts.append(f"Estado: '{filters['state']}'")
-    if filters.get('different_phones'):
-        parts.append("Telefones diferentes")
+    if filters.get('license_number'):
+        parts.append(f"Licença: '{filters['license_number']}'")
+    if filters.get('different_addresses'):
+        parts.append("Endereços diferentes (practice ≠ mailing)")
+    if filters.get('no_practice_address'):
+        parts.append("Sem endereço de prática")
+    if filters.get('recent_update'):
+        parts.append("Atualizado nos últimos 3 meses")
     
     return " | ".join(parts)
 
@@ -190,16 +198,66 @@ def apply_filters(df, filters):
                 filtered_df[col].str.upper() == filters['state'].upper()
             ]
     
-    # Filter by different phone numbers
-    if filters.get('different_phones'):
-        mailing_col = 'Provider Business Mailing Address Telephone Number'
-        practice_col = 'Provider Business Practice Location Address Telephone Number'
-        if mailing_col in filtered_df.columns and practice_col in filtered_df.columns:
+    # Filter by license number (searches across all 15 license columns)
+    if filters.get('license_number'):
+        license_cols = [f'Provider License Number_{i}' for i in range(1, 16)]
+        license_mask = pd.Series([False] * len(filtered_df), index=filtered_df.index)
+        
+        for col in license_cols:
+            if col in filtered_df.columns:
+                # Convert to string and do partial match (case-insensitive)
+                license_mask |= filtered_df[col].astype(str).str.lower().str.contains(
+                    filters['license_number'].lower(), na=False, regex=False
+                )
+        
+        filtered_df = filtered_df[license_mask]
+    
+    # Filter by different addresses (practice vs mailing)
+    if filters.get('different_addresses'):
+        practice_addr = 'Provider First Line Business Practice Location Address'
+        mailing_addr = 'Provider First Line Business Mailing Address'
+        if practice_addr in filtered_df.columns and mailing_addr in filtered_df.columns:
+            # Compare addresses (normalize for comparison)
             filtered_df = filtered_df[
-                filtered_df[mailing_col].notna() &
-                filtered_df[practice_col].notna() &
-                (filtered_df[mailing_col] != filtered_df[practice_col])
+                filtered_df[practice_addr].notna() &
+                filtered_df[mailing_addr].notna() &
+                (filtered_df[practice_addr].astype(str).str.strip() != filtered_df[mailing_addr].astype(str).str.strip())
             ]
+    
+    # Filter by no practice address (not working)
+    if filters.get('no_practice_address'):
+        practice_addr_col = 'Provider First Line Business Practice Location Address'
+        if practice_addr_col in filtered_df.columns:
+            filtered_df = filtered_df[
+                filtered_df[practice_addr_col].isna() | 
+                (filtered_df[practice_addr_col].astype(str).str.strip() == "")
+            ]
+    
+    # Filter by recent update (last 3 months) - for newly graduated/registered nurses
+    if filters.get('recent_update'):
+        update_col = 'Last Update Date'
+        if update_col in filtered_df.columns:
+            # Calculate date 3 months ago
+            three_months_ago = datetime.now() - relativedelta(months=3)
+            
+            # Convert date strings to datetime, handling MM/DD/YYYY format
+            def parse_date(date_str):
+                if pd.isna(date_str) or date_str == '':
+                    return None
+                try:
+                    # Try MM/DD/YYYY format
+                    return datetime.strptime(str(date_str).strip(), '%m/%d/%Y')
+                except (ValueError, TypeError):
+                    return None
+            
+            # Filter rows where update date is within last 3 months
+            filtered_df['_parsed_date'] = filtered_df[update_col].apply(parse_date)
+            filtered_df = filtered_df[
+                filtered_df['_parsed_date'].notna() &
+                (filtered_df['_parsed_date'] >= three_months_ago)
+            ]
+            # Remove temporary column
+            filtered_df = filtered_df.drop(columns=['_parsed_date'], errors='ignore')
     
     return filtered_df
 
@@ -284,7 +342,10 @@ def main():
         'last_name': None,
         'city': None,
         'state': None,
-        'different_phones': False
+        'license_number': None,
+        'different_addresses': False,
+        'no_practice_address': False,
+        'recent_update': False
     }
     
     current_page = 1
@@ -305,11 +366,14 @@ def main():
         print("  3) Filtrar por sobrenome")
         print("  4) Filtrar por cidade")
         print("  5) Filtrar por estado")
-        print("  6) Limpar filtros")
-        print("  7) Ver estatísticas")
-        print("  8) Exportar resultados filtrados")
-        print("  9) Busca rápida (nome completo)")
-        print(" 10) Filtrar: telefones diferentes (mailing ≠ practice)")
+        print("  6) Filtrar por número de licença")
+        print("  7) Limpar filtros")
+        print("  8) Ver estatísticas")
+        print("  9) Exportar resultados filtrados")
+        print(" 10) Busca rápida (nome completo)")
+        print(" 11) Filtrar: endereços diferentes (practice ≠ mailing)")
+        print(" 12) Filtrar: sem endereço de prática (não está trabalhando)")
+        print(" 13) Filtrar: atualizado nos últimos 3 meses (recém-formados/cadastrados)")
         print("  0) Sair")
         print("="*60)
         
@@ -364,19 +428,28 @@ def main():
             current_page = 1
         
         elif choice == '6':
+            license_num = input("\nDigite o número de licença (ou Enter para limpar): ").strip()
+            filters['license_number'] = license_num if license_num else None
+            filtered_df = apply_filters(df, filters)
+            current_page = 1
+        
+        elif choice == '7':
             filters = {
                 'first_name': None,
                 'last_name': None,
                 'city': None,
                 'state': None,
-                'different_phones': False
+                'license_number': None,
+                'different_addresses': False,
+                'no_practice_address': False,
+                'recent_update': False
             }
             filtered_df = df.copy()
             current_page = 1
             print("\n✅ Filtros limpos!")
             input("Pressione Enter para continuar...")
         
-        elif choice == '7':
+        elif choice == '8':
             clear_screen()
             if len(filtered_df) > 0:
                 show_statistics(filtered_df)
@@ -397,7 +470,7 @@ def main():
                 print("\n❌ Nenhum resultado para exportar.\n")
                 input("Pressione Enter para continuar...")
         
-        elif choice == '9':
+        elif choice == '10':
             clear_screen()
             print("\n🔍 BUSCA RÁPIDA")
             print("="*60)
@@ -415,10 +488,28 @@ def main():
                 display_results(quick_df, page_size=20, page=1)
             input("\nPressione Enter para continuar...")
         
-        elif choice == '10':
-            filters['different_phones'] = not filters.get('different_phones', False)
-            status = "ATIVADO" if filters['different_phones'] else "DESATIVADO"
-            print(f"\n✅ Filtro de telefones diferentes {status}")
+        elif choice == '11':
+            filters['different_addresses'] = not filters.get('different_addresses', False)
+            status = "ATIVADO" if filters['different_addresses'] else "DESATIVADO"
+            print(f"\n✅ Filtro de endereços diferentes {status}")
+            filtered_df = apply_filters(df, filters)
+            current_page = 1
+            input("Pressione Enter para continuar...")
+        
+        elif choice == '12':
+            filters['no_practice_address'] = not filters.get('no_practice_address', False)
+            status = "ATIVADO" if filters['no_practice_address'] else "DESATIVADO"
+            print(f"\n✅ Filtro de sem endereço de prática {status}")
+            filtered_df = apply_filters(df, filters)
+            current_page = 1
+            input("Pressione Enter para continuar...")
+        
+        elif choice == '13':
+            filters['recent_update'] = not filters.get('recent_update', False)
+            status = "ATIVADO" if filters['recent_update'] else "DESATIVADO"
+            three_months_ago = datetime.now() - relativedelta(months=3)
+            print(f"\n✅ Filtro de atualização recente (últimos 3 meses) {status}")
+            print(f"   Data de corte: {three_months_ago.strftime('%d/%m/%Y')}")
             filtered_df = apply_filters(df, filters)
             current_page = 1
             input("Pressione Enter para continuar...")

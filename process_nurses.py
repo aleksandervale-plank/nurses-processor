@@ -29,6 +29,7 @@ from config import (
     FILTER_COLUMNS,
     PHONE_MAILING_COLUMN,
     PHONE_PRACTICE_COLUMN,
+    USEFUL_COLUMNS,
     DEFAULT_CHUNK_SIZE,
     DEFAULT_OUTPUT_FILE
 )
@@ -162,15 +163,19 @@ def filter_nurses_polars(
             chunk_filtered = len(df_filtered)
             filtered_rows += chunk_filtered
             
-            # Write to output file
+            # Write to output file (only useful columns)
             if chunk_filtered > 0:
+                # Select only useful columns that exist in the dataframe
+                available_useful_cols = [col for col in USEFUL_COLUMNS if col in df_filtered.columns]
+                df_output = df_filtered.select(available_useful_cols)
+                
                 if first_chunk:
-                    df_filtered.write_csv(output_file)
+                    df_output.write_csv(output_file)
                     first_chunk = False
                 else:
                     # Append to existing file
                     with open(output_file, 'ab') as f:
-                        df_filtered.write_csv(f, include_header=False)
+                        df_output.write_csv(f, include_header=False)
             
             print(f"  Chunk {chunk_num}: {len(df):,} rows → {chunk_filtered:,} nurses (Total: {filtered_rows:,})")
             
@@ -287,9 +292,13 @@ def filter_nurses_pandas(
         chunk_filtered = len(df_filtered)
         filtered_rows += chunk_filtered
         
-        # Write to output file
+        # Write to output file (only useful columns)
         if chunk_filtered > 0:
-            df_filtered.to_csv(
+            # Select only useful columns that exist in the dataframe
+            available_useful_cols = [col for col in USEFUL_COLUMNS if col in df_filtered.columns]
+            df_output = df_filtered[available_useful_cols]
+            
+            df_output.to_csv(
                 output_file,
                 mode='w' if first_chunk else 'a',
                 header=first_chunk,
