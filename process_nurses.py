@@ -122,11 +122,13 @@ def filter_nurses_polars(
             total_rows += len(df)
             
             # Filter for nurses: check if ANY taxonomy code column contains a nurse code
+            # Filter for nurse taxonomy codes (using prefix matching)
+            # This allows matching all specializations (e.g., '163W' matches '163W00000X', '163WA0400X', etc.)
             nurse_filter = pl.lit(False)
             for col in TAXONOMY_CODE_COLUMNS:
                 if col in df.columns:
-                    for code in NURSE_TAXONOMY_CODES:
-                        nurse_filter = nurse_filter | (df[col] == code)
+                    for code_prefix in NURSE_TAXONOMY_CODES:
+                        nurse_filter = nurse_filter | df[col].cast(pl.Utf8).str.starts_with(code_prefix)
             
             df_filtered = df.filter(nurse_filter)
             
@@ -251,11 +253,13 @@ def filter_nurses_pandas(
         total_rows += len(chunk)
         
         # Filter for nurses: check if ANY taxonomy code column contains a nurse code
+        # Filter for nurse taxonomy codes (using prefix matching)
+        # This allows matching all specializations (e.g., '163W' matches '163W00000X', '163WA0400X', etc.)
         nurse_mask = pd.Series([False] * len(chunk), index=chunk.index)
         for col in TAXONOMY_CODE_COLUMNS:
             if col in chunk.columns:
-                for code in NURSE_TAXONOMY_CODES:
-                    nurse_mask |= (chunk[col] == code)
+                for code_prefix in NURSE_TAXONOMY_CODES:
+                    nurse_mask |= chunk[col].astype(str).str.startswith(code_prefix, na=False)
         
         df_filtered = chunk[nurse_mask]
         

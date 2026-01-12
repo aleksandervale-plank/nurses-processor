@@ -1,13 +1,71 @@
 """
 Configuration constants for the Nurses CSV Processor.
 """
+# ============================================================================
+# NURSE TAXONOMY CODES - Comprehensive List
+# ============================================================================
+# Based on NUCC (National Uniform Claim Committee) Healthcare Provider Taxonomy
+# Updated: January 2026
+# 
+# Strategy: Use prefixes to match ALL specializations within each category
+# Example: '163W' matches all RN specializations (163W00000X, 163WA0400X, etc.)
+#
+# CATEGORIES INCLUDED:
+# -------------------
+# 163W - Registered Nurses (RN) - All 56+ specializations
+#        Examples: General RN, Pediatric, Critical Care, Ambulatory, etc.
+#
+# 164W - Licensed Practical Nurse (LPN)
+# 164X - Licensed Vocational Nurse (LVN)
+#
+# 363L - Nurse Practitioners (NP/APRN) - Advanced Practice (18+ specializations)
+#        Examples: Family NP, Adult Health, Pediatric, Psychiatric, etc.
+#
+# 364S - Clinical Nurse Specialists (CNS) - 33+ specializations
+#        Examples: Adult Health, Pediatric, Psychiatric, Critical Care, etc.
+#
+# 367  - Nurse Anesthetists and Midwives
+#   3675 - Certified Registered Nurse Anesthetist (CRNA)
+#   367A - Advanced Practice Midwife (APRN-CNM)
+#   367H - Certified Nurse Midwife (CNM)
+#
+# CATEGORIES EXCLUDED:
+# -------------------
+# 363A - Physician Assistant (PA) - NOT a nurse
+# 372  - Nursing Assistants/Aides - NOT licensed nurses
+# 373  - Nursing Attendants - NOT licensed nurses
+# 374  - Technicians (EMT, Radiology, etc) - NOT nurses
+# 376  - Support roles (Administrators, IT) - NOT clinical nurses
+#
+# ============================================================================
 
-# Nurse taxonomy codes to filter
+# Use prefixes to match all specializations automatically
 NURSE_TAXONOMY_CODES = [
-    '363L00000X',  # Nurse Practitioner
-    '163W00000X',  # Registered Nurse (RN)
-    '164W00000X',  # Licensed Practical Nurse (LPN)
+    # Registered Nurses (RN) - all specializations
+    '163W',  # Matches: 163W00000X, 163WA0400X, 163WC0200X, etc. (56+ codes)
+    
+    # Licensed Practical/Vocational Nurses
+    '164W',  # Licensed Practical Nurse (LPN)
+    '164X',  # Licensed Vocational Nurse (LVN)
+    
+    # Advanced Practice Registered Nurses (APRN)
+    '363L',  # Nurse Practitioners - all specializations (18+ codes)
+    '364S',  # Clinical Nurse Specialists - all specializations (33+ codes)
+    
+    # Nurse Anesthetists and Midwives
+    '3675',  # Certified Registered Nurse Anesthetist (CRNA)
+    '367A',  # Advanced Practice Midwife
+    '367H',  # Certified Nurse Midwife (CNM)
 ]
+
+# Optional: Include nursing assistants and technicians (currently excluded)
+# Uncomment these if you want to include non-licensed nursing staff:
+# NURSING_SUPPORT_CODES = [
+#     '3725',  # Nursing Assistant
+#     '3726',  # Nursing Aide
+#     '373H',  # Nursing Attendant
+#     '374J',  # Nursing Technician
+# ]
 
 # Column names for taxonomy codes (15 possible taxonomy columns)
 TAXONOMY_CODE_COLUMNS = [
